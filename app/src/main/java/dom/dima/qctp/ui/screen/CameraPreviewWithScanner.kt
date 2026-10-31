@@ -64,7 +64,9 @@ fun CameraPreviewWithScanner() {
 
     val executor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
-        onDispose { executor.shutdown() }
+        onDispose {
+            executor.shutdown()
+            SoundFeedback.release()        }
     }
 
     Box(Modifier.fillMaxSize()) {
