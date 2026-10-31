@@ -39,6 +39,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import dom.dima.qctp.sound.SoundFeedback
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,12 +115,14 @@ fun CameraPreviewWithScanner() {
                                             }
                                             when (result) {
                                                 is SaveResult.Incomplete -> {
+                                                    SoundFeedback.click()
                                                     snackbarHostState.showSnackbar(
                                                         "Сохранено: ${result.savedName} " +
                                                                 "(осталось ${result.missing} из ${result.total})"
                                                     )
                                                 }
                                                 is SaveResult.Complete -> {
+                                                    SoundFeedback.click()
                                                     snackbarHostState.showSnackbar(
                                                         "Готово: ${result.mergedFile.name} " +
                                                                 "(${result.pages} стр.)"
