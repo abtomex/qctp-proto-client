@@ -1,9 +1,12 @@
 package dom.dima.qctp.ui.screen
 
-import android.util.Log
 import androidx.annotation.OptIn
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import dom.dima.qctp.util.SaveResult
+import dom.dima.qctp.util.saveQrPayload
+import dom.dima.qctp.util.shareMergedFile
+import android.util.Log
+import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -11,25 +14,31 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import dom.dima.qctp.util.SaveResult
-import dom.dima.qctp.util.saveQrPayload
-import dom.dima.qctp.util.shareMergedFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,22 +51,29 @@ fun CameraPreviewWithScanner() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Защита от повторного сканирования того же QR подряд
     val lastScanned = remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Файл, ожидающий отправки (для диалога)
+    // Последний собранный итоговый файл — для кнопки "Отправить файл"
+    var lastMergedFile by remember { mutableStateOf<File?>(null) }
+    // Файл, для которого сейчас показан диалог отправки
     var pendingShare by remember { mutableStateOf<File?>(null) }
 
     val executor = remember { Executors.newSingleThreadExecutor() }
-    DisposableEffect(Unit) { onDispose { executor.shutdown() } }
+    DisposableEffect(Unit) {
+        onDispose { executor.shutdown() }
+    }
 
     Box(Modifier.fillMaxSize()) {
+        // --- Превью камеры + анализатор ---
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 PreviewView(ctx).apply {
                     scaleType = PreviewView.ScaleType.FILL_CENTER
+
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                     cameraProviderFuture.addListener({
                         val cameraProvider = cameraProviderFuture.get()
@@ -79,7 +95,8 @@ fun CameraPreviewWithScanner() {
                         analysis.setAnalyzer(executor) { imageProxy: ImageProxy ->
                             val mediaImage = imageProxy.image
                             if (mediaImage == null) {
-                                imageProxy.close(); return@setAnalyzer
+                                imageProxy.close()
+                                return@setAnalyzer
                             }
                             val image = InputImage.fromMediaImage(
                                 mediaImage, imageProxy.imageInfo.rotationDegrees
@@ -88,36 +105,36 @@ fun CameraPreviewWithScanner() {
                                 .addOnSuccessListener { codes ->
                                     for (b in codes) {
                                         val raw = b.rawValue ?: continue
-                                        if (raw != lastScanned.value) {
-                                            lastScanned.value = raw
-                                            scope.launch {
-                                                // Парсинг+запись — в IO-диспетчере
-                                                val result = withContext(Dispatchers.IO) {
-                                                    saveQrPayload(ctx, raw)
+                                        if (raw == lastScanned.value) continue
+                                        lastScanned.value = raw
+
+                                        scope.launch {
+                                            val result = withContext(Dispatchers.IO) {
+                                                saveQrPayload(ctx, raw)
+                                            }
+                                            when (result) {
+                                                is SaveResult.Incomplete -> {
+                                                    snackbarHostState.showSnackbar(
+                                                        "Сохранено: ${result.savedName} " +
+                                                                "(осталось ${result.missing} из ${result.total})"
+                                                    )
                                                 }
-                                                when (result) {
-                                                    is SaveResult.Incomplete -> {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Сохранено: ${result.savedName} " +
-                                                                    "(осталось ${result.missing} из ${result.total})"
-                                                        )
-                                                    }
-                                                    is SaveResult.Complete -> {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Готово: ${result.mergedFile.name} " +
-                                                                    "(${result.pages} стр.)"
-                                                        )
-                                                        // Сбрасываем "последний" QR,
-                                                        // чтобы можно было сразу сканировать новый комплект
-                                                        lastScanned.value = null
-                                                        // Предлагаем отправить
-                                                        pendingShare = result.mergedFile
-                                                    }
-                                                    is SaveResult.Error -> {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Ошибка: ${result.message}"
-                                                        )
-                                                    }
+                                                is SaveResult.Complete -> {
+                                                    snackbarHostState.showSnackbar(
+                                                        "Готово: ${result.mergedFile.name} " +
+                                                                "(${result.pages} стр.)"
+                                                    )
+                                                    lastMergedFile = result.mergedFile
+                                                    pendingShare = result.mergedFile
+                                                    // Сбрасываем, чтобы можно было
+                                                    // начать новый комплект без "увода" камеры
+                                                    lastScanned.value = null
+                                                }
+                                                is SaveResult.Error -> {
+                                                    snackbarHostState.showSnackbar(
+                                                        "Ошибка: ${result.message}"
+                                                    )
+                                                    lastScanned.value = null
                                                 }
                                             }
                                         }
@@ -145,19 +162,30 @@ fun CameraPreviewWithScanner() {
             }
         )
 
+        // --- Snackbar внизу ---
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
-        // Диалог "отправить файл?"
+        // --- Кнопка "Отправить файл" сверху справа ---
+        if (lastMergedFile != null) {
+            Button(
+                onClick = { pendingShare = lastMergedFile },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Text("Отправить файл")
+            }
+        }
+
+        // --- Диалог отправки ---
         pendingShare?.let { file ->
             AlertDialog(
                 onDismissRequest = { pendingShare = null },
                 title = { Text("Комплект собран") },
-                text = {
-                    Text("Файл ${file.name} готов. Отправить?")
-                },
+                text = { Text("Файл ${file.name} готов. Отправить?") },
                 confirmButton = {
                     TextButton(onClick = {
                         pendingShare = null
@@ -166,7 +194,9 @@ fun CameraPreviewWithScanner() {
                         } catch (e: Exception) {
                             Log.e("Share", "Failed", e)
                             scope.launch {
-                                snackbarHostState.showSnackbar("Не удалось поделиться: ${e.message}")
+                                snackbarHostState.showSnackbar(
+                                    "Не удалось поделиться: ${e.message}"
+                                )
                             }
                         }
                     }) { Text("Отправить") }
