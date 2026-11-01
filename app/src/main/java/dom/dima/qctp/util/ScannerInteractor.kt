@@ -1,11 +1,13 @@
 package dom.dima.qctp.util
 
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
+import android.util.Base64
 import android.util.Log
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
-import android.content.Intent
-import androidx.core.content.FileProvider
 
 sealed interface SaveResult {
     data class Incomplete(val savedName: String, val missing: Int, val total: Int) : SaveResult
@@ -19,7 +21,7 @@ fun saveQrPayload(context: Context, jsonString: String): SaveResult {
         val fileName = json.getString("fileName")
         val page = json.getInt("page")
         val totalPages = json.getInt("totalPages")
-        val content = json.getString("content")
+        val contentBase64 = json.getString("content")
 
         if (fileName.contains("/") || fileName.contains("..") || fileName.isBlank()) {
             return SaveResult.Error("Invalid fileName")
@@ -28,12 +30,19 @@ fun saveQrPayload(context: Context, jsonString: String): SaveResult {
             return SaveResult.Error("Invalid page/totalPages")
         }
 
+        // Декодируем base64 в байты
+        val bytes = try {
+            Base64.decode(contentBase64, Base64.NO_WRAP)
+        } catch (e: IllegalArgumentException) {
+            return SaveResult.Error("Invalid base64 in content")
+        }
+
         val appDir = File(context.filesDir, "scanned_data").apply { mkdirs() }
         val bookDir = File(appDir, fileName).apply { mkdirs() }
 
-        // 1. Пишем страницу
+        // 1. Пишем страницу как бинарный файл
         val pageFile = File(bookDir, "$fileName.$page.txt")
-        pageFile.writeText(content)
+        pageFile.writeBytes(bytes)
 
         // 2. Проверяем комплект
         val missing = (1..totalPages).filter {
@@ -43,11 +52,13 @@ fun saveQrPayload(context: Context, jsonString: String): SaveResult {
             return SaveResult.Incomplete(pageFile.name, missing.size, totalPages)
         }
 
-        // 3. Собираем итоговый файл встык
-        val merged = File(bookDir, "$fileName.txt")
-        merged.bufferedWriter().use { out ->
+        // 3. Собираем итоговый файл встык — побайтово
+        val merged = File(bookDir, "$fileName")
+        merged.outputStream().buffered().use { out ->
             for (i in 1..totalPages) {
-                out.write(File(bookDir, "$fileName.$i.txt").readText())
+                File(bookDir, "$fileName.$i.txt").inputStream().buffered().use { input ->
+                    input.copyTo(out)
+                }
             }
         }
 
@@ -62,8 +73,6 @@ fun saveQrPayload(context: Context, jsonString: String): SaveResult {
         SaveResult.Error(e.message ?: "Unknown error")
     }
 }
-
-
 fun shareMergedFile(context: Context, file: File) {
     val uri = FileProvider.getUriForFile(
         context,
@@ -71,10 +80,18 @@ fun shareMergedFile(context: Context, file: File) {
         file
     )
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"           // поменяйте на "application/octet-stream" при необходимости
+
+        type = "application/octet-stream"
+//        type = "*/*"
+
         putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(Intent.EXTRA_SUBJECT, file.nameWithoutExtension)
+        putExtra(Intent.EXTRA_TEXT, "Файл: ${file.name}")
+
+//        clipData = ClipData.newRawUri("scanned_file", uri)
+
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
+
     context.startActivity(Intent.createChooser(intent, "Отправить файл"))
 }
