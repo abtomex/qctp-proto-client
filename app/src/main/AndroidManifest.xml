@@ -6,9 +6,9 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:label="QR Scanner"
+        android:label="QCTP-Proto"
         android:theme="@style/Theme.Material3.DayNight.NoActionBar"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_launcher_1"
         >
         <activity
             android:name=".MainActivity"
