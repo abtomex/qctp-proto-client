@@ -1,0 +1,85 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+  <!-- Фон -->
+  <path
+      android:pathData="M104,0L408,0A104,104 0,0 1,512 104L512,408A104,104 0,0 1,408 512L104,512A104,104 0,0 1,0 408L0,104A104,104 0,0 1,104 0z"
+      android:fillColor="#101828"/>
+
+  <!-- QR: три угловых маркера -->
+  <path
+      android:pathData="M48,64H144V160H48V64ZM68,84V140H124V84H68ZM82,98H110V126H82V98Z"
+      android:fillColor="#F8FAFC"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M48,246H144V342H48V246ZM68,266V322H124V266H68ZM82,280H110V308H82V280Z"
+      android:fillColor="#F8FAFC"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M166,64H190V88H166V64ZM202,88H226V112H202V88ZM166,124H190V148H166V124ZM48,178H72V202H48V178ZM84,190H120V214H84V190ZM132,166H156V190H132V166ZM180,178H204V202H180V178ZM156,214H180V238H156V214ZM198,202H222V226H198V202ZM166,262H190V286H166V262ZM202,250H226V274H202V250ZM166,310H190V342H166V310Z"
+      android:fillColor="#F8FAFC"/>
+
+  <!-- Луч: оранжевый треугольник -->
+  <path
+      android:pathData="M300,350L30,404L300,112Z"
+      android:fillColor="#FFD447"
+      android:fillAlpha="0.3"/>
+
+  <!-- ФОНАРИК: голубой цилиндр из вершины тупого угла (300,350) до правого нижнего угла -->
+  <!-- тело цилиндра -->
+  <path
+      android:pathData="M300,350L480,500"
+      android:strokeColor="#60A5FA"
+      android:strokeWidth="100"
+      android:strokeLineCap="butt"/>
+  <!-- торец цилиндра (линза у вершины луча) -->
+
+  <!-- Двоичный код: строки 101 / 001 / 010 -->
+  <path
+      android:pathData="M368,64L382,64V112H368V79L356,84V72L368,67V64Z"
+      android:fillColor="#FFD447"/>
+  <path
+      android:pathData="M398,78C398,70.27 404.27,64 412,64C419.73,64 426,70.27 426,78V98C426,105.73 419.73,112 412,112C404.27,112 398,105.73 398,98V78ZM408,78V98C408,100.21 409.79,102 412,102C414.21,102 416,100.21 416,98V78C416,75.79 414.21,74 412,74C409.79,74 408,75.79 408,78Z"
+      android:fillColor="#FFD447"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M464,64L478,64V112H464V79L452,84V72L464,67V64Z"
+      android:fillColor="#FFD447"/>
+
+  <path
+      android:pathData="M354,142C354,134.27 360.27,128 368,128C375.73,128 382,134.27 382,142V162C382,169.73 375.73,176 368,176C360.27,176 354,169.73 354,162V142ZM364,142V162C364,164.21 365.79,166 368,166C370.21,166 372,164.21 372,162V142C372,139.79 370.21,138 368,138C365.79,138 364,139.79 364,142Z"
+      android:fillColor="#FFD447"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M398,142C398,134.27 404.27,128 412,128C419.73,128 426,134.27 426,142V162C426,169.73 419.73,176 412,176C404.27,176 398,169.73 398,162V142ZM408,142V162C408,164.21 409.79,166 412,166C414.21,166 416,164.21 416,162V142C416,139.79 414.21,138 412,138C409.79,138 408,139.79 408,142Z"
+      android:fillColor="#FFD447"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M464,128L478,128V176H464V143L452,148V136L464,131V128Z"
+      android:fillColor="#FFD447"/>
+
+  <path
+      android:pathData="M354,206C354,198.27 360.27,192 368,192C375.73,192 382,198.27 382,206V226C382,233.73 375.73,240 368,240C360.27,240 354,233.73 354,226V206ZM364,206V226C364,228.21 365.79,230 368,230C370.21,230 372,228.21 372,226V206C372,203.79 370.21,202 368,202C365.79,202 364,203.79 364,206Z"
+      android:fillColor="#FFD447"
+      android:fillType="evenOdd"/>
+  <path
+      android:pathData="M412,192L426,192V240H412V207L400,212V200L412,195V192Z"
+      android:fillColor="#FFD447"/>
+  <path
+      android:pathData="M450,206C450,198.27 456.27,192 464,192C471.73,192 478,198.27 478,206V226C478,233.73 471.73,240 464,240C456.27,240 450,233.73 450,226V206ZM460,206V226C460,228.21 461.79,230 464,230C466.21,230 468,228.21 468,226V206C468,203.79 466.21,202 464,202C461.79,202 460,203.79 460,206Z"
+      android:fillColor="#FFD447"
+      android:fillType="evenOdd"/>
+
+  <!-- три точки под строкой 010 -->
+  <path
+      android:pathData="M392,264m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0"
+      android:fillColor="#FFD447"/>
+  <path
+      android:pathData="M416,264m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0"
+      android:fillColor="#FFD447"/>
+  <path
+      android:pathData="M440,264m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0"
+      android:fillColor="#FFD447"/>
+</vector>
