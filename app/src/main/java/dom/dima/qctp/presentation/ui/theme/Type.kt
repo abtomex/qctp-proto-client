@@ -1,4 +1,4 @@
-package dom.dima.qctp.ui.theme
+package dom.dima.qctp.presentation.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

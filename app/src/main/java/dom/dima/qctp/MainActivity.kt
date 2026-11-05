@@ -8,7 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.lifecycle.lifecycleScope
-import dom.dima.qctp.ui.screen.QrScannerScreen
+import dom.dima.qctp.presentation.ui.screen.QrScannerScreen
 import dom.dima.qctp.util.clearScannedData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

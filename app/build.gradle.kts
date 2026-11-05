@@ -76,5 +76,7 @@ dependencies {
     // Viewmodel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+//    koin
+    implementation(libs.koin.androidx.compose)
 
 }

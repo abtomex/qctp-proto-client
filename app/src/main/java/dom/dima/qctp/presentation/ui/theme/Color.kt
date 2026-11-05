@@ -1,4 +1,4 @@
-package dom.dima.qctp.ui.theme
+package dom.dima.qctp.presentation.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

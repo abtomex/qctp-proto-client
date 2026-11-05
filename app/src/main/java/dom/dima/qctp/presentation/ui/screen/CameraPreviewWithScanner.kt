@@ -1,4 +1,4 @@
-package dom.dima.qctp.ui.screen
+package dom.dima.qctp.presentation.ui.screen
 
 import android.util.Log
 import android.view.ScaleGestureDetector
@@ -48,7 +48,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import dom.dima.qctp.util.shareMergedFile
-import dom.dima.qctp.viewmodel.CameraViewModel
+import dom.dima.qctp.presentation.viewmodel.CameraViewModel
 import java.util.concurrent.Executors
 
 @OptIn(ExperimentalGetImage::class)

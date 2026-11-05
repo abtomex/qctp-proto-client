@@ -1,4 +1,4 @@
-package dom.dima.qctp.sound
+package dom.dima.qctp.presentation.sound
 
 import android.media.AudioManager
 import android.media.ToneGenerator
