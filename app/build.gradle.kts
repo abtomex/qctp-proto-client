@@ -73,5 +73,8 @@ dependencies {
 
     // Accompanist permissions
     implementation(libs.accompanist.permissions)
+    // Viewmodel
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,51 +41,47 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import dom.dima.qctp.sound.SoundFeedback
-import dom.dima.qctp.util.SaveResult
-import dom.dima.qctp.util.saveQrPayload
 import dom.dima.qctp.util.shareMergedFile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
+import dom.dima.qctp.viewmodel.CameraViewModel
 import java.util.concurrent.Executors
 
 @OptIn(ExperimentalGetImage::class)
 @Composable
-fun CameraPreviewWithScanner() {
+fun CameraPreviewWithScanner(
+    viewModel: CameraViewModel = viewModel()
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Защита от повторного сканирования того же QR подряд
-    val lastScanned = remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Последний собранный итоговый файл — для кнопки "Отправить файл"
-    var lastMergedFile by remember { mutableStateOf<File?>(null) }
-    // Файл, для которого сейчас показан диалог отправки
-    var pendingShare by remember { mutableStateOf<File?>(null) }
+    // Состояние из ViewModel
+    val lastMergedFile by viewModel.lastMergedFile.collectAsStateWithLifecycle()
+    val pendingShare by viewModel.pendingShare.collectAsStateWithLifecycle()
 
-    // --- Зум ---
+    // Сообщения (snackbar) — однократные события
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect { msg ->
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
-    // Линейный зум для ползунка (0f..1f)
     var linearZoom by remember { mutableFloatStateOf(0f) }
-    // Текущий зум в "разах" — для жеста щипка
     var zoomRatio by remember { mutableFloatStateOf(1f) }
     var minZoomRatio by remember { mutableFloatStateOf(1f) }
     var maxZoomRatio by remember { mutableFloatStateOf(1f) }
 
+    // Executor для ImageAnalysis
     val executor = remember { Executors.newSingleThreadExecutor() }
     DisposableEffect(Unit) {
-        onDispose {
-            executor.shutdown()
-            SoundFeedback.release()
-        }
+        onDispose { executor.shutdown() }
     }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -127,38 +124,9 @@ fun CameraPreviewWithScanner() {
                                     .addOnSuccessListener { codes ->
                                         for (b in codes) {
                                             val raw = b.rawValue ?: continue
-                                            if (raw == lastScanned.value) continue
-                                            lastScanned.value = raw
-
-                                            scope.launch {
-                                                val result = withContext(Dispatchers.IO) {
-                                                    saveQrPayload(ctx, raw)
-                                                }
-                                                when (result) {
-                                                    is SaveResult.Incomplete -> {
-                                                        SoundFeedback.click()
-                                                        snackbarHostState.showSnackbar(
-                                                            "Сохранено: ${result.savedName} " +
-                                                                    "(осталось ${result.missing} из ${result.total})"
-                                                        )
-                                                    }
-                                                    is SaveResult.Complete -> {
-                                                        SoundFeedback.click()
-                                                        snackbarHostState.showSnackbar(
-                                                            "Готово: ${result.mergedFile.name} " +
-                                                                    "(${result.pages} стр.)"
-                                                        )
-                                                        lastMergedFile = result.mergedFile
-                                                        pendingShare = result.mergedFile
-                                                        lastScanned.value = null
-                                                    }
-                                                    is SaveResult.Error -> {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Ошибка: ${result.message}"
-                                                        )
-                                                        lastScanned.value = null
-                                                    }
-                                                }
+                                            // Фильтрация дубликатов — в ViewModel
+                                            if (viewModel.shouldHandleQr(raw)) {
+                                                viewModel.processQr(raw)
                                             }
                                         }
                                     }
@@ -177,20 +145,16 @@ fun CameraPreviewWithScanner() {
                                     analysis
                                 )
 
-                                // --- Инициализируем данные зума из CameraInfo ---
                                 cameraControl = camera.cameraControl
                                 camera.cameraInfo.zoomState.value?.let { state ->
                                     minZoomRatio = state.minZoomRatio
                                     maxZoomRatio = state.maxZoomRatio
                                     zoomRatio = state.zoomRatio
-                                    // setLinearZoom оперирует 0..1, а zoomRatio — "разами".
-                                    // Для начального положения ползунка переведём:
                                     linearZoom = if (maxZoomRatio > minZoomRatio) {
                                         (zoomRatio - minZoomRatio) / (maxZoomRatio - minZoomRatio)
                                     } else 0f
                                 }
 
-                                // --- Жест "щипок" ---
                                 val scaleDetector = ScaleGestureDetector(
                                     ctx,
                                     object : SimpleOnScaleGestureListener() {
@@ -203,7 +167,6 @@ fun CameraPreviewWithScanner() {
 
                                             control.setZoomRatio(newZoom)
                                             zoomRatio = newZoom
-                                            // Синхронизируем ползунок
                                             linearZoom = if (maxZoomRatio > minZoomRatio) {
                                                 (newZoom - minZoomRatio) / (maxZoomRatio - minZoomRatio)
                                             } else 0f
@@ -224,20 +187,19 @@ fun CameraPreviewWithScanner() {
                 }
             )
 
-            // --- Snackbar внизу ---
+            // --- Snackbar ---
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
-            // --- Ползунок зума внизу ---
+            // --- Ползунок зума ---
             cameraControl?.let { control ->
                 Slider(
                     value = linearZoom,
                     onValueChange = { value ->
                         linearZoom = value
                         control.setLinearZoom(value)
-                        // Синхронизируем zoomRatio (для жеста)
                         zoomRatio = minZoomRatio + value * (maxZoomRatio - minZoomRatio)
                     },
                     modifier = Modifier
@@ -247,10 +209,10 @@ fun CameraPreviewWithScanner() {
                 )
             }
 
-            // --- Кнопка "Отправить файл" сверху справа ---
+            // --- Кнопка "Отправить файл" ---
             if (lastMergedFile != null) {
                 Button(
-                    onClick = { pendingShare = lastMergedFile },
+                    onClick = { viewModel.requestShareLast() },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
@@ -262,36 +224,34 @@ fun CameraPreviewWithScanner() {
             // --- Диалог отправки ---
             pendingShare?.let { file ->
                 AlertDialog(
-                    onDismissRequest = { pendingShare = null },
+                    onDismissRequest = { viewModel.dismissShareDialog() },
                     title = { Text("Комплект собран") },
                     text = { Text("Файл ${file.name} готов. Отправить?") },
                     confirmButton = {
                         TextButton(onClick = {
-                            pendingShare = null
+                            viewModel.confirmShare()
                             try {
                                 shareMergedFile(context, file)
                             } catch (e: Exception) {
-                                Log.e("Share", "Failed", e)
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        "Не удалось поделиться: ${e.message}"
-                                    )
-                                }
+                                viewModel.onShareError(e)
                             }
                         }) { Text("Отправить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { pendingShare = null }) { Text("Позже") }
+                        TextButton(onClick = { viewModel.dismissShareDialog() }) {
+                            Text("Позже")
+                        }
                     }
                 )
             }
         }
     }
-
 }
 
 @androidx.compose.ui.tooling.preview.Preview
 @Composable
 fun CameraPreviewWithScannerPrev() {
+    // В Preview ViewModel не создастся с реальными данными,
+    // но UI отрисуется. Для полноценного превью нужен fake ViewModel.
     CameraPreviewWithScanner()
 }
