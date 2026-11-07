@@ -32,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,8 +45,8 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import dom.dima.qctp.presentation.sound.SoundFeedback
 import dom.dima.qctp.presentation.viewmodel.CameraViewModel
-import dom.dima.qctp.util.shareMergedFile
 import org.koin.androidx.compose.koinViewModel
 import java.util.concurrent.Executors
 
@@ -59,19 +58,26 @@ fun CameraPreviewWithScanner(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     // Состояние из ViewModel
     val lastMergedFile by viewModel.lastMergedFile.collectAsStateWithLifecycle()
     val pendingShare by viewModel.pendingShare.collectAsStateWithLifecycle()
 
-    // Сообщения (snackbar) — однократные события
+    // Обработка событий (звук, снекбар)
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { msg ->
-            snackbarHostState.showSnackbar(msg)
+        viewModel.events.collect { event ->
+            when (event) {
+                is CameraViewModel.UiEvent.PlayClickSound -> {
+                    SoundFeedback.click()
+                }
+                is CameraViewModel.UiEvent.ShowMessage -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
         }
     }
 
+    // Локальное состояние для зума
     var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
     var linearZoom by remember { mutableFloatStateOf(0f) }
     var zoomRatio by remember { mutableFloatStateOf(1f) }
@@ -86,6 +92,7 @@ fun CameraPreviewWithScanner(
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
+
             // --- Превью камеры + анализатор ---
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -124,7 +131,8 @@ fun CameraPreviewWithScanner(
                                     .addOnSuccessListener { codes ->
                                         for (b in codes) {
                                             val raw = b.rawValue ?: continue
-                                            // Фильтрация дубликатов — в ViewModel
+
+                                            // Фильтрация дубликатов и отправка в ViewModel
                                             if (viewModel.shouldHandleQr(raw)) {
                                                 viewModel.processQr(raw)
                                             }
@@ -222,20 +230,18 @@ fun CameraPreviewWithScanner(
             }
 
             // --- Диалог отправки ---
-            pendingShare?.let { file ->
+            pendingShare?.let { fileData ->
+                // fileData: Pair<String, String> — (path, name)
                 AlertDialog(
                     onDismissRequest = { viewModel.dismissShareDialog() },
                     title = { Text("Комплект собран") },
-                    text = { Text("Файл ${file.name} готов. Отправить?") },
+                    text = { Text("Файл ${fileData.second} готов. Отправить?") },
                     confirmButton = {
                         TextButton(onClick = {
                             viewModel.confirmShare()
-                            try {
-                                shareMergedFile(context, file)
-                            } catch (e: Exception) {
-                                viewModel.onShareError(e)
-                            }
-                        }) { Text("Отправить") }
+                        }) {
+                            Text("Отправить")
+                        }
                     },
                     dismissButton = {
                         TextButton(onClick = { viewModel.dismissShareDialog() }) {
@@ -251,7 +257,5 @@ fun CameraPreviewWithScanner(
 @androidx.compose.ui.tooling.preview.Preview
 @Composable
 fun CameraPreviewWithScannerPrev() {
-    // В Preview ViewModel не создастся с реальными данными,
-    // но UI отрисуется. Для полноценного превью нужен fake ViewModel.
     CameraPreviewWithScanner()
 }

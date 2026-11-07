@@ -4,19 +4,16 @@ import android.util.Base64
 import android.util.Log
 import dom.dima.qctp.domain.FileRepository
 import dom.dima.qctp.domain.QrCameraInteractor
-import dom.dima.qctp.util.SaveResult
+import dom.dima.qctp.domain.model.SaveResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.File
 
 class QrCameraInteractorImpl(
     private val fileRepository: FileRepository
 ) : QrCameraInteractor {
 
-    override fun saveQrPayload(jsonString: String): Flow<SaveResult> = flow {
+    override suspend fun saveQrPayload(jsonString: String): SaveResult = withContext(Dispatchers.IO) {
         try {
             val json = JSONObject(jsonString)
             val fileName = json.getString("fileName")
@@ -25,37 +22,32 @@ class QrCameraInteractorImpl(
             val contentBase64 = json.getString("content")
 
             if (fileName.contains("/") || fileName.contains("..") || fileName.isBlank()) {
-                emit(SaveResult.Error("Invalid fileName"))
-                return@flow
+                return@withContext SaveResult.Error("Invalid fileName")
             }
             if (page < 1 || totalPages < 1 || page > totalPages) {
-                emit(SaveResult.Error("Invalid page/totalPages"))
-                return@flow
+                return@withContext SaveResult.Error("Invalid page/totalPages")
             }
 
             val bytes = try {
                 Base64.decode(contentBase64, Base64.NO_WRAP)
             } catch (_: IllegalArgumentException) {
-                emit(SaveResult.Error("Invalid base64 in content"))
-                return@flow
+                return@withContext SaveResult.Error("Invalid base64 in content")
             }
 
-            val bookDir = fileRepository.initBookDir(fileName)
-            val pageFile = fileRepository.writePartFile(page, bookDir, bytes)
+            fileRepository.initBookDir(fileName)
+            val pageFileName = fileRepository.writePartFile(fileName, page, bytes)
 
-            if (!fileRepository.isAllPagesPresent(bookDir, fileName, totalPages)) {
-                val missingCount = (1..totalPages).count { !File(bookDir, "$fileName.$it.txt").exists() }
-                emit(SaveResult.Incomplete(pageFile.name, missingCount, totalPages))
-                return@flow
+            if (!fileRepository.isAllPagesPresent(fileName, totalPages)) {
+                val missingCount = fileRepository.calculateMissingPages(fileName, totalPages)
+                return@withContext SaveResult.Incomplete(pageFileName, missingCount, totalPages)
             }
+            val (filePath, mergedName) = fileRepository.mergeFile(fileName, totalPages)
+            fileRepository.removePartsFragments(fileName, totalPages)
 
-            val merged = fileRepository.mergeFile(bookDir, fileName, totalPages)
-            fileRepository.removePartsFragments(bookDir, totalPages, fileName)
-
-            emit(SaveResult.Complete(merged, totalPages))
+            SaveResult.Complete(filePath, mergedName, totalPages)
         } catch (e: Exception) {
             Log.e("SavePayload", "Error", e)
-            emit(SaveResult.Error(e.message ?: "Unknown error"))
+            SaveResult.Error(e.message ?: "Unknown error")
         }
-    }.flowOn(Dispatchers.IO)
+    }
 }

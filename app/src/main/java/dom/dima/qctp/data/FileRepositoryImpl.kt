@@ -8,18 +8,24 @@ class FileRepositoryImpl(
     private val context: Context
 ) : FileRepository {
 
-    override suspend fun initBookDir(fileName: String): File {
+    private fun getBookDir(fileName: String): File {
         val appDir = File(context.filesDir, "scanned_data").apply { mkdirs() }
         return File(appDir, fileName).apply { mkdirs() }
     }
 
-    override suspend fun writePartFile(page: Int, bookDir: File, bytes: ByteArray): File {
-        val pageFile = File(bookDir, "${bookDir.name}.$page.txt")
-        pageFile.writeBytes(bytes)
-        return pageFile
+    override suspend fun initBookDir(fileName: String) {
+        getBookDir(fileName)
     }
 
-    override suspend fun mergeFile(bookDir: File, fileName: String, totalPages: Int): File {
+    override suspend fun writePartFile(fileName: String, page: Int, bytes: ByteArray): String {
+        val bookDir = getBookDir(fileName)
+        val pageFile = File(bookDir, "$fileName.$page.txt")
+        pageFile.writeBytes(bytes)
+        return pageFile.name
+    }
+
+    override suspend fun mergeFile(fileName: String, totalPages: Int): Pair<String, String> {
+        val bookDir = getBookDir(fileName)
         val merged = File(bookDir, fileName)
         merged.outputStream().buffered().use { out ->
             for (i in 1..totalPages) {
@@ -28,16 +34,23 @@ class FileRepositoryImpl(
                 }
             }
         }
-        return merged
+        return Pair(merged.absolutePath, merged.name)
     }
 
-    override suspend fun removePartsFragments(bookDir: File, totalPages: Int, fileName: String) {
+    override suspend fun removePartsFragments(fileName: String, totalPages: Int) {
+        val bookDir = getBookDir(fileName)
         for (i in 1..totalPages) {
             File(bookDir, "$fileName.$i.txt").delete()
         }
     }
 
-    override suspend fun isAllPagesPresent(bookDir: File, fileName: String, totalPages: Int): Boolean {
+    override suspend fun isAllPagesPresent(fileName: String, totalPages: Int): Boolean {
+        val bookDir = getBookDir(fileName)
         return (1..totalPages).all { File(bookDir, "$fileName.$it.txt").exists() }
+    }
+
+    override suspend fun calculateMissingPages(fileName: String, totalPages: Int): Int {
+        val bookDir = getBookDir(fileName)
+        return (1..totalPages).count { !File(bookDir, "$fileName.$it.txt").exists() }
     }
 }

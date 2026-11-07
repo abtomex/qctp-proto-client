@@ -1,12 +1,10 @@
 package dom.dima.qctp.domain
 
-import java.io.File
-
 interface FileRepository {
-
-    suspend fun initBookDir(fileName: String): File
-    suspend fun writePartFile(page: Int, bookDir: File, bytes: ByteArray): File
-    suspend fun mergeFile(bookDir: File, fileName: String, totalPages: Int): File
-    suspend fun removePartsFragments(bookDir: File, totalPages: Int, fileName: String)
-    suspend fun isAllPagesPresent(bookDir: File, fileName: String, totalPages: Int): Boolean
+    suspend fun initBookDir(fileName: String)
+    suspend fun writePartFile(fileName: String, page: Int, bytes: ByteArray): String
+    suspend fun mergeFile(fileName: String, totalPages: Int): Pair<String, String>
+    suspend fun removePartsFragments(fileName: String, totalPages: Int)
+    suspend fun isAllPagesPresent(fileName: String, totalPages: Int): Boolean
+    suspend fun calculateMissingPages(fileName: String, totalPages: Int): Int
 }

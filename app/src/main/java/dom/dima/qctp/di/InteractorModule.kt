@@ -7,10 +7,6 @@ import dom.dima.qctp.domain.impl.QrCameraInteractorImpl
 import org.koin.dsl.module
 
 val interactorModule = module {
-    single<QrCameraInteractor> {
-        QrCameraInteractorImpl(get())
-    }
-    single<FileSendInteractor> {
-        FileSendInteractorImpl()
-    }
+    single<QrCameraInteractor> { QrCameraInteractorImpl(get()) }
+    single<FileSendInteractor> { FileSendInteractorImpl(get()) } // Теперь нужен Context
 }
