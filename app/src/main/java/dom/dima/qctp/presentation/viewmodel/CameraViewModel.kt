@@ -1,23 +1,22 @@
 package dom.dima.qctp.presentation.viewmodel
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dom.dima.qctp.domain.QrCameraInteractor
 import dom.dima.qctp.presentation.sound.SoundFeedback
 import dom.dima.qctp.util.SaveResult
-import dom.dima.qctp.util.saveQrPayload
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 
-class CameraViewModel(application: Application) : AndroidViewModel(application) {
+class CameraViewModel (
+    val qrCameraInteractor: QrCameraInteractor
+) : ViewModel() {
 
     // --- Состояние экрана ---
     private val _lastMergedFile = MutableStateFlow<File?>(null)
@@ -52,32 +51,39 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun processQr(raw: String) {
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                saveQrPayload(getApplication(), raw)
-            }
-            when (result) {
-                is SaveResult.Incomplete -> {
-                    SoundFeedback.click()
-                    _messages.send(
-                        "Сохранено: ${result.savedName} " +
-                                "(осталось ${result.missing} из ${result.total})"
-                    )
+            qrCameraInteractor.saveQrPayload(raw)
+                .collect { result ->
+                    when (result) {
+                        is SaveResult.Incomplete -> {
+                            SoundFeedback.click()
+                            _messages.send(
+                                "Сохранено: ${result.savedName} " +
+                                        "(осталось ${result.missing} из ${result.total})"
+                            )
+                        }
+
+                        is SaveResult.Complete -> {
+                            SoundFeedback.click()
+                            _messages.send(
+                                "Готово: ${result.mergedFile.name} (${result.pages} стр.)"
+                            )
+                            _lastMergedFile.value = result.mergedFile
+                            _pendingShare.value = result.mergedFile
+                            resetLastScanned()
+                        }
+
+                        is SaveResult.Error -> {
+                            _messages.send("Ошибка: ${result.message}")
+                            resetLastScanned()
+                        }
+                    }
                 }
-                is SaveResult.Complete -> {
-                    SoundFeedback.click()
-                    _messages.send(
-                        "Готово: ${result.mergedFile.name} (${result.pages} стр.)"
-                    )
-                    _lastMergedFile.value = result.mergedFile
-                    _pendingShare.value = result.mergedFile
-                    resetLastScanned()
-                }
-                is SaveResult.Error -> {
-                    _messages.send("Ошибка: ${result.message}")
-                    resetLastScanned()
-                }
-            }
+
         }
+
+//            val result = withContext(Dispatchers.IO) {
+//                qrCameraInteractor.saveQrPayload(getApplication(), raw)
+//            }
     }
 
     /** Пользователь нажал кнопку "Отправить файл". */

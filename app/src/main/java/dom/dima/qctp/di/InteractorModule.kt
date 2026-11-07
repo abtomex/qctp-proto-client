@@ -8,7 +8,7 @@ import org.koin.dsl.module
 
 val interactorModule = module {
     single<QrCameraInteractor> {
-        QrCameraInteractorImpl()
+        QrCameraInteractorImpl(get())
     }
     single<FileSendInteractor> {
         FileSendInteractorImpl()

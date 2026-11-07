@@ -6,9 +6,8 @@ import org.koin.dsl.module
 
 val repositoryModule = module {
 
-
     single<FileRepository> {
-        FileRepositoryImpl()
+        FileRepositoryImpl(get())
     }
 
 }
