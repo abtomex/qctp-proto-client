@@ -47,27 +47,54 @@ class CameraViewModel(
 
     fun processQr(raw: String) {
         viewModelScope.launch {
-            when (val result = qrCameraInteractor.saveQrPayload(raw)) {
-                is SaveResult.Incomplete -> {
-                    _events.send(UiEvent.PlayClickSound)
-                    _events.send(UiEvent.ShowMessage("Сохранено: ${result.savedName} (осталось ${result.missing} из ${result.total})"))
-                }
-                is SaveResult.Complete -> {
-                    _events.send(UiEvent.PlayClickSound)
-                    _events.send(UiEvent.ShowMessage("Готово: ${result.fileName} (${result.pages} стр.)"))
+            qrCameraInteractor.saveQrPayload(raw)
+                .collect { result ->
+                    when (result) {
+                        is SaveResult.Incomplete -> {
+                            _events.send(UiEvent.PlayClickSound)
+                            _events.send(UiEvent.ShowMessage("Сохранено: ${result.savedName} (осталось ${result.missing} из ${result.total})"))
+                        }
+                        is SaveResult.Complete -> {
+                            _events.send(UiEvent.PlayClickSound)
+                            _events.send(UiEvent.ShowMessage("Готово: ${result.fileName} (${result.pages} стр.)"))
 
-                    val fileData = Pair(result.filePath, result.fileName)
-                    _lastMergedFile.value = fileData
-                    _pendingShare.value = fileData
-                    resetLastScanned()
+                            val fileData = Pair(result.filePath, result.fileName)
+                            _lastMergedFile.value = fileData
+                            _pendingShare.value = fileData
+                            resetLastScanned()
+                        }
+                        is SaveResult.Error -> {
+                            _events.send(UiEvent.ShowMessage("Ошибка: ${result.message}"))
+                            resetLastScanned()
+                        }
+                    }
                 }
-                is SaveResult.Error -> {
-                    _events.send(UiEvent.ShowMessage("Ошибка: ${result.message}"))
-                    resetLastScanned()
-                }
-            }
         }
     }
+
+//    fun processQr1(raw: String) {
+//        viewModelScope.launch {
+//            when (val result = qrCameraInteractor.saveQrPayload(raw)) {
+//                is SaveResult.Incomplete -> {
+//                    _events.send(UiEvent.PlayClickSound)
+//                    _events.send(UiEvent.ShowMessage("Сохранено: ${result.savedName} (осталось ${result.missing} из ${result.total})"))
+//                }
+//                is SaveResult.Complete -> {
+//                    _events.send(UiEvent.PlayClickSound)
+//                    _events.send(UiEvent.ShowMessage("Готово: ${result.fileName} (${result.pages} стр.)"))
+//
+//                    val fileData = Pair(result.filePath, result.fileName)
+//                    _lastMergedFile.value = fileData
+//                    _pendingShare.value = fileData
+//                    resetLastScanned()
+//                }
+//                is SaveResult.Error -> {
+//                    _events.send(UiEvent.ShowMessage("Ошибка: ${result.message}"))
+//                    resetLastScanned()
+//                }
+//            }
+//        }
+//    }
 
     fun requestShareLast() {
         _pendingShare.value = _lastMergedFile.value
