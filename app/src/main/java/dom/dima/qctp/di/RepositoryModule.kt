@@ -5,10 +5,5 @@ import dom.dima.qctp.domain.FileRepository
 import org.koin.dsl.module
 
 val repositoryModule = module {
-
-    single<FileRepository> {
-        FileRepositoryImpl(get())
-    }
-
+    single<FileRepository> { FileRepositoryImpl(get()) }
 }
-

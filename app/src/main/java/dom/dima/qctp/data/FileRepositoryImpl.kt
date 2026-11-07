@@ -5,20 +5,18 @@ import dom.dima.qctp.domain.FileRepository
 import java.io.File
 
 class FileRepositoryImpl(
-    val context: Context
+    private val context: Context
 ) : FileRepository {
+
     override suspend fun initBookDir(fileName: String): File {
         val appDir = File(context.filesDir, "scanned_data").apply { mkdirs() }
         return File(appDir, fileName).apply { mkdirs() }
     }
 
     override suspend fun writePartFile(page: Int, bookDir: File, bytes: ByteArray): File {
-
         val pageFile = File(bookDir, "${bookDir.name}.$page.txt")
         pageFile.writeBytes(bytes)
-
-        return bookDir
-
+        return pageFile
     }
 
     override suspend fun mergeFile(bookDir: File, fileName: String, totalPages: Int): File {
@@ -37,7 +35,9 @@ class FileRepositoryImpl(
         for (i in 1..totalPages) {
             File(bookDir, "$fileName.$i.txt").delete()
         }
-
     }
 
+    override suspend fun isAllPagesPresent(bookDir: File, fileName: String, totalPages: Int): Boolean {
+        return (1..totalPages).all { File(bookDir, "$fileName.$it.txt").exists() }
+    }
 }

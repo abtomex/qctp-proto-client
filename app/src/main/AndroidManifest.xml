@@ -6,6 +6,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
+        android:name=".QctpApplication"
         android:label="QCTP-Proto"
         android:theme="@style/Theme.Material3.DayNight.NoActionBar"
         android:icon="@mipmap/ic_launcher_12"
